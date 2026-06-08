@@ -2,3 +2,5 @@ pandas
 json
 argparse
 openpyxl
+google-api-python-client
+google-auth

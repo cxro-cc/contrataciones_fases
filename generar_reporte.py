@@ -32,7 +32,7 @@ import json
 import re
 import sys
 import pandas as pd
-from datetime import date
+from datetime import datetime
 
 
 # --------------------------------------------------------------------
@@ -497,7 +497,7 @@ def main():
     uas, upe = cargar_y_resolver(args.uas, args.upe, args.catalogo)
 
     print("Calculando vistas…")
-    corte = date.today().strftime('%#d / %m / %Y').lstrip('0')  # strips leading zero
+    corte = datetime.now().strftime('%d / %m / %Y a las %H:%M')
     payload = construir_payload(uas, upe, corte)
 
     print("Inyectando en la plantilla…")
