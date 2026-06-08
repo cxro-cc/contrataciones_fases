@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Candidatos por Fase — Estatus UAS y UPE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --guinda: #9b2247;
+    --verde:  #1e5b4f;
+    --dorado: #a57f2c;
+    --ink:    #0d0d0d;
+    --ink-2:  #353535;
+    --ink-3:  #6b6b6b;
+    --line:   #d8d6cf;
+    --paper:  #ffffff;
+    --soft:   #f0ede4;
+    --softer: #faf8f3;
+    --ok:     #144a40;
+    --no:     #8a1d3d;
+    --pe:     #6b6b6b;
+    --rv:     #8e6a1f;
+    --pebar:  #c4c1b8;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--paper); color: var(--ink); }
+  body {
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 400;
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    padding: 48px 24px 80px;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; }
+
+  /* Header */
+  .doc-header { padding-bottom: 28px; margin-bottom: 28px; }
+  h1 { font-size: 32px; font-weight: 400; margin: 0; color: var(--ink); letter-spacing: -0.01em; }
+  .meta {
+    font-size: 13px; color: var(--ink-2); margin: 16px 0 0;
+    display: flex; gap: 18px; flex-wrap: wrap;
+  }
+  .meta span:not(:last-child)::after { content: '·'; margin-left: 18px; color: var(--ink-3); }
+
+  /* Phase selector */
+  .phase-bar {
+    display: flex; flex-wrap: wrap; gap: 4px;
+    margin: 0 0 40px;
+    padding: 5px; background: var(--soft); border-radius: 3px;
+  }
+  .phase-tab {
+    flex: 1 1 auto; min-width: 90px;
+    background: transparent; border: 0;
+    font-family: inherit; font-size: 12.5px; font-weight: 500;
+    color: var(--ink-2); letter-spacing: 0.04em;
+    padding: 10px 12px; border-radius: 2px;
+    cursor: pointer; text-align: center;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .phase-tab:hover { color: var(--ink); }
+  .phase-tab.active {
+    background: var(--paper); color: var(--ink);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .phase-tab .sub {
+    display: block; font-size: 10.5px; font-weight: 400;
+    color: var(--ink-3); margin-top: 2px;
+    letter-spacing: 0.02em; text-transform: none;
+  }
+  .phase-tab.active .sub { color: var(--ink-2); }
+
+  /* Section title */
+  .section-title {
+    font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink-2); font-weight: 500;
+    margin: 48px 0 20px;
+  }
+  .section-title:first-of-type { margin-top: 0; }
+
+  /* Totals cards */
+  .totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 28px; }
+  .total-card {
+    background: var(--softer); border-radius: 4px;
+    padding: 20px 22px; position: relative;
+  }
+  .total-card::before {
+    content: ''; position: absolute; top: 0; left: 0;
+    width: 32px; height: 2px; background: var(--guinda);
+  }
+  .total-card.upe::before { background: var(--verde); }
+  .total-card.aprob::before { background: var(--dorado); }
+  .total-card .label {
+    font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--ink-2); margin: 0 0 8px; font-weight: 500;
+  }
+  .total-card .num {
+    font-size: 42px; font-weight: 300; color: var(--ink);
+    margin: 0; line-height: 1; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .total-card .sub { font-size: 12px; color: var(--ink-2); margin: 8px 0 0; }
+
+  /* Viz toggle */
+  .viz-toggle {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: transparent; border: 1px solid var(--ink);
+    color: var(--ink); font-family: inherit; font-size: 12px; font-weight: 500;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 9px 16px; border-radius: 2px; cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    margin: 0 0 28px;
+  }
+  .viz-toggle:hover { background: var(--ink); color: #fff; }
+  .viz-toggle .arr {
+    display: inline-block; width: 7px; height: 7px;
+    border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg);
+    margin-left: 2px; margin-top: -2px;
+    transition: transform 0.2s ease;
+  }
+  .viz-toggle.open .arr { transform: rotate(-135deg); margin-top: 2px; }
+  .viz-panel { display: none; }
+  .viz-panel.open { display: block; margin-bottom: 36px; }
+
+  /* Viz inner segmented */
+  .viz-switch {
+    display: inline-flex; background: var(--soft);
+    border-radius: 3px; padding: 3px; margin: 0 0 22px;
+  }
+  .viz-switch button {
+    background: transparent; border: 0;
+    font-family: inherit; font-size: 11.5px; font-weight: 500;
+    color: var(--ink-2); letter-spacing: 0.04em;
+    padding: 7px 16px; border-radius: 2px; cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .viz-switch button:hover { color: var(--ink); }
+  .viz-switch button.active {
+    background: var(--paper); color: var(--ink);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .viz-view { display: none; }
+  .viz-view.active { display: block; }
+  .viz-chart { margin-bottom: 28px; }
+  .viz-chart:last-child { margin-bottom: 0; }
+  .viz-legend {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    margin: 12px 0 0; font-size: 11.5px; color: var(--ink-2);
+  }
+  .viz-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .viz-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 2px; }
+
+  /* Resumen tables */
+  .ledger-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 12px; gap: 12px; flex-wrap: wrap;
+  }
+  .ledger-head .name { font-size: 16px; font-weight: 500; color: var(--ink); margin: 0; }
+  .ledger-head .stat { font-size: 12px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .ledger-head .stat .ok { color: var(--ok); font-weight: 500; }
+  .ledger-head .stat .no { color: var(--no); font-weight: 500; }
+  .ledger-head .stat .pe { color: var(--pe); }
+  .ledger-head .stat .rv { color: var(--rv); font-weight: 500; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 32px; }
+  thead th {
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-2); font-weight: 500;
+    text-align: right; padding: 8px 10px 14px;
+  }
+  thead th:first-child { text-align: left; padding-left: 0; }
+  thead th:last-child  { padding-right: 0; }
+  tbody td {
+    padding: 10px; text-align: right;
+    font-variant-numeric: tabular-nums; color: var(--ink);
+  }
+  tbody td:first-child { text-align: left; padding-left: 0; }
+  tbody td:last-child  { padding-right: 0; }
+  td.ok { color: var(--ok); }
+  td.no { color: var(--no); }
+  td.pe { color: var(--pe); }
+  td.rv { color: var(--rv); }
+
+  /* CLUES blocks */
+  .clues-block {
+    cursor: pointer; transition: background-color 0.15s ease;
+    border-radius: 4px; margin: 0 -10px; padding: 18px 10px;
+  }
+  .clues-block:hover { background-color: var(--softer); }
+  .clues-block.open { background-color: var(--softer); }
+  .clues-head { position: relative; padding-right: 28px; }
+  .clues-code {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px; color: var(--ink-2);
+    letter-spacing: 0.03em; font-weight: 500;
+  }
+  .clues-name {
+    font-size: 15px; font-weight: 500; color: var(--ink);
+    margin: 4px 0 0; line-height: 1.35;
+  }
+  .clues-estado {
+    font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-2); white-space: nowrap; font-weight: 500;
+  }
+  .clues-head .row-top {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  }
+  .chevron {
+    position: absolute; right: 4px; top: 6px;
+    width: 10px; height: 10px;
+    border-right: 2px solid var(--ink-2);
+    border-bottom: 2px solid var(--ink-2);
+    transform: rotate(45deg);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+  }
+  .clues-block.open .chevron {
+    transform: rotate(-135deg) translate(-2px, -2px);
+    border-color: var(--guinda);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 44px 56px auto 1fr;
+    gap: 14px; align-items: center;
+    padding: 7px 0; font-size: 13px;
+    margin-top: 4px;
+  }
+  .row-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .row-label.uas { color: var(--guinda); }
+  .row-label.upe { color: var(--verde); }
+  .row-total {
+    font-variant-numeric: tabular-nums; font-size: 17px;
+    font-weight: 400; color: var(--ink); text-align: right;
+  }
+  .row-status { font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; font-size: 13px; }
+  .row-status .ok { color: var(--ok); font-weight: 500; }
+  .row-status .no { color: var(--no); font-weight: 500; }
+  .row-status .pe { color: var(--pe); }
+  .row-status .rv { color: var(--rv); font-weight: 500; }
+  .cats { display: flex; flex-wrap: wrap; gap: 5px 6px; justify-content: flex-end; }
+  .cat {
+    font-size: 11.5px; color: var(--ink); background: var(--soft);
+    border-radius: 2px; padding: 3px 9px;
+    white-space: nowrap; font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em; font-weight: 500;
+  }
+
+  /* Detail view */
+  .clues-detail {
+    margin-top: 14px; padding: 16px 18px 8px;
+    background: var(--paper); border-radius: 4px;
+    display: none;
+  }
+  .clues-block.open .clues-detail { display: block; }
+  .detail-source { margin-bottom: 20px; }
+  .detail-source:last-child { margin-bottom: 4px; }
+  .detail-source-label {
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    font-weight: 600; margin: 0 0 10px;
+    padding-bottom: 6px; border-bottom: 1px dashed #c8c6bf;
+  }
+  .detail-source-label.uas { color: var(--guinda); }
+  .detail-source-label.upe { color: var(--verde); }
+  .detail-cat { margin-bottom: 14px; }
+  .detail-cat:last-child { margin-bottom: 0; }
+  .detail-cat-name {
+    font-size: 12.5px; font-weight: 600; color: var(--ink);
+    margin: 0 0 6px; letter-spacing: 0.02em;
+  }
+  .detail-cat-name .count { font-weight: 400; color: var(--ink-2); margin-left: 6px; }
+  .detail-puesto {
+    display: grid; grid-template-columns: 1fr auto auto;
+    gap: 14px; align-items: baseline;
+    padding: 5px 0 5px 12px; font-size: 13px;
+  }
+  .detail-puesto-name { color: var(--ink); line-height: 1.4; }
+  .detail-puesto-total {
+    font-variant-numeric: tabular-nums; color: var(--ink);
+    font-weight: 500; font-size: 13px;
+  }
+  .detail-puesto-status {
+    font-size: 12px; font-variant-numeric: tabular-nums;
+    color: var(--ink-2); white-space: nowrap;
+    min-width: 110px; text-align: right;
+  }
+  .detail-puesto-status .ok { color: var(--ok); }
+  .detail-puesto-status .no { color: var(--no); }
+  .detail-puesto-status .pe { color: var(--pe); }
+  .detail-puesto-status .rv { color: var(--rv); }
+  .detail-hint { font-size: 11px; color: var(--ink-3); margin: 4px 0 0; font-style: italic; }
+
+  /* Empty CLUES */
+  .empty-list { margin-top: 4px; }
+  .empty-row {
+    display: grid; grid-template-columns: 110px 1fr auto;
+    gap: 16px; align-items: baseline; padding: 10px 0;
+  }
+  .empty-row .clues-code {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px; color: var(--ink-2);
+    letter-spacing: 0.03em; font-weight: 500;
+  }
+  .empty-name { font-size: 14px; color: var(--ink); font-weight: 400; line-height: 1.4; }
+  .empty-estado {
+    font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-2); white-space: nowrap; font-weight: 500;
+  }
+  .empty-note {
+    grid-column: 2 / 4; font-size: 12.5px; color: var(--guinda);
+    margin-top: 4px; line-height: 1.5; font-style: italic; font-weight: 500;
+  }
+  .empty-note::before { content: '↳ '; font-style: normal; margin-right: 2px; }
+
+  /* Phase summary subtitle */
+  .phase-subtitle {
+    font-size: 13px; color: var(--ink-2);
+    margin: -16px 0 28px;
+  }
+  .phase-subtitle strong {
+    font-weight: 600; color: var(--ink);
+  }
+
+  /* Hidden helper */
+  .hidden { display: none !important; }
+
+  @media (max-width: 600px) {
+    body { padding: 32px 16px 60px; }
+    .totals { grid-template-columns: 1fr; }
+    .phase-tab { min-width: 0; flex: 1 1 calc(33.333% - 6px); }
+    .row { grid-template-columns: 36px 44px auto; }
+    .row .cats { grid-column: 1 / -1; justify-content: flex-start; margin-top: 4px; }
+    h1 { font-size: 22px; }
+    .clues-head .row-top { flex-direction: column; gap: 4px; }
+    .empty-row { grid-template-columns: 1fr; gap: 2px; }
+    .viz-legend { padding-left: 0 !important; }
+  }
+  @media print {
+    body { background: white; padding: 24px; }
+    .phase-bar { display: none; }
+    .total-card { break-inside: avoid; }
+    .clues-block { break-inside: avoid; }
+    .clues-detail { display: block !important; }
+    .chevron { display: none !important; }
+    .viz-panel { display: block !important; }
+    .viz-toggle { display: none !important; }
+    .viz-view { display: block !important; }
+    .viz-switch { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="doc-header">
+    <h1>Candidatos por Fase — Estatus UAS y UPE</h1>
+    <p class="meta">
+      <span id="corteLabel">Corte</span>
+      <span id="phaseInfo"></span>
+    </p>
+  </header>
+
+  <div class="phase-bar" id="phaseBar" role="tablist" aria-label="Selección de fase"></div>
+
+  <div id="phaseContent"></div>
+
+</div>
+
+<script>
+const DATA = __PAYLOAD__;
+
+const PHASE1_NOTES = {};
+
+const COLORS = { ok:'#144a40', no:'#8a1d3d', rv:'#8e6a1f', pe:'#c4c1b8' };
+
+const CAT_ORDER = [
+  'Médicos especialistas','Médicos generales','Enfermería',
+  'Otros profesionales de salud','Administrativos y apoyo','Otros'
+];
+const CAT_SHORT = {
+  'Médicos especialistas': 'ME',
+  'Médicos generales': 'MG',
+  'Enfermería': 'E',
+  'Otros profesionales de salud': 'OP',
+  'Administrativos y apoyo': 'AD',
+  'Otros': 'X'
+};
+
+const UAS_STATUSES = [['Aprobado','ok','✓'],['No aprobado','no','✗'],['Pendiente','pe','⋯']];
+const UPE_STATUSES = [['Aceptado','ok','✓'],['Rechazado','no','✗'],['Revisión','rv','⟳'],['Pendiente','pe','⋯']];
+
+function escHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function fmtStatus(obj, order) {
+  const parts = [];
+  for (const [key, cls, sym] of order) {
+    if (obj[key]) parts.push(`<span class="${cls}">${sym}${obj[key]}</span>`);
+  }
+  return parts.join(' · ');
+}
+
+function renderTotales(view) {
+  return `<p class="section-title">Resumen general</p>
+  <div class="totals">
+    <div class="total-card"><p class="label">UAS</p><p class="num">${view.totales.uas}</p><p class="sub">candidatos enviados</p></div>
+    <div class="total-card upe"><p class="label">UPE</p><p class="num">${view.totales.upe}</p><p class="sub">candidatos enviados</p></div>
+    <div class="total-card aprob"><p class="label">Aprobados</p><p class="num">${view.totales.aprobados}</p><p class="sub">aceptados por UPE</p></div>
+  </div>`;
+}
+
+/* SVG builders for the visualization */
+function buildBarChart({rows, statuses, maxVal, label, color, leftWidth, height}) {
+  const LABEL_W = leftWidth;
+  const BAR_X = LABEL_W + 10;
+  const BAR_W = 560 - BAR_X;
+  const COUNT_X = 565;
+  const ROW_H = height;
+  const GAP = 4;
+  const head_h = 36;
+  const total_h = head_h + rows.length * (ROW_H + GAP) + 8;
+
+  let out = `<svg viewBox="0 0 640 ${total_h}" width="100%" xmlns="http://www.w3.org/2000/svg">`;
+  out += `<text x="0" y="18" font-family="Montserrat, sans-serif" font-size="12" font-weight="600" letter-spacing="1.5" fill="${color}">${escHtml(label)}</text>`;
+  out += `<line x1="${BAR_X}" y1="${head_h - 2}" x2="${BAR_X + BAR_W}" y2="${head_h - 2}" stroke="#d8d6cf" stroke-width="0.5"/>`;
+  let y = head_h + 4;
+  for (const r of rows) {
+    // left label(s)
+    if (r.code) {
+      out += `<text x="0" y="${y + ROW_H/2 + 4}" font-family="JetBrains Mono, monospace" font-size="10.5" font-weight="500" fill="#353535">${escHtml(r.code)}</text>`;
+      out += `<text x="105" y="${y + ROW_H/2 + 4}" font-family="Montserrat, sans-serif" font-size="11" fill="#6b6b6b">${escHtml(r.name || '')}</text>`;
+    } else {
+      out += `<text x="${LABEL_W - 8}" y="${y + ROW_H/2 + 4}" font-family="Montserrat, sans-serif" font-size="12" font-weight="500" fill="#353535" text-anchor="end">${escHtml(r.name)}</text>`;
+    }
+    if (r.total === 0) {
+      out += `<line x1="${BAR_X}" y1="${y + ROW_H/2}" x2="${BAR_X + 20}" y2="${y + ROW_H/2}" stroke="#d8d6cf" stroke-width="1.5"/>`;
+      out += `<text x="${COUNT_X}" y="${y + ROW_H/2 + 4}" font-family="Montserrat, sans-serif" font-size="11" font-style="italic" fill="#a0a0a0">—</text>`;
+    } else {
+      let x = BAR_X;
+      for (const [sname, cls] of statuses) {
+        const v = r.status[sname] || 0;
+        if (!v) continue;
+        const w = (v / maxVal) * BAR_W;
+        const fill = COLORS[cls];
+        out += `<rect x="${x.toFixed(2)}" y="${y}" width="${w.toFixed(2)}" height="${ROW_H}" fill="${fill}"><title>${sname}: ${v}</title></rect>`;
+        if (w >= 22) {
+          const tc = cls !== 'pe' ? '#ffffff' : '#353535';
+          out += `<text x="${(x + w/2).toFixed(2)}" y="${y + ROW_H/2 + 4}" font-family="Montserrat, sans-serif" font-size="${ROW_H < 26 ? 10 : 11}" font-weight="500" fill="${tc}" text-anchor="middle">${v}</text>`;
+        }
+        x += w;
+      }
+      out += `<text x="${COUNT_X}" y="${y + ROW_H/2 + 4}" font-family="Montserrat, sans-serif" font-size="${ROW_H < 26 ? 12 : 13}" font-weight="500" fill="#0d0d0d">${r.total}</text>`;
+    }
+    y += ROW_H + GAP;
+  }
+  out += `</svg>`;
+  return out;
+}
+
+function renderVizCat(view) {
+  // UAS by category
+  const uasRows = view.uas_categorias.map(c => ({
+    name: c.cat, total: c.total,
+    status: { 'Aprobado': c.Aprobado, 'No aprobado': c['No aprobado'], 'Pendiente': c.Pendiente }
+  }));
+  const uasMax = Math.max(1, ...uasRows.map(r => r.total));
+  const upeRows = view.upe_categorias.map(c => ({
+    name: c.cat, total: c.total,
+    status: { 'Aceptado': c.Aceptado, 'Rechazado': c.Rechazado, 'Revisión': c['Revisión'], 'Pendiente': c.Pendiente }
+  }));
+  const upeMax = Math.max(1, ...upeRows.map(r => r.total));
+
+  let html = '<div class="viz-chart">';
+  html += buildBarChart({rows: uasRows, statuses: [['Aprobado','ok'],['No aprobado','no'],['Pendiente','pe']], maxVal: uasMax, label: 'UAS · Distribución por estatus', color: '#9b2247', leftWidth: 170, height: 30});
+  html += `<div class="viz-legend" style="padding-left: 180px;">
+    <span><i style="background:#144a40"></i>Aprobado</span>
+    <span><i style="background:#8a1d3d"></i>No aprobado</span>
+    <span><i style="background:#c4c1b8"></i>Pendiente</span>
+  </div></div>`;
+  if (upeRows.length) {
+    html += '<div class="viz-chart">';
+    html += buildBarChart({rows: upeRows, statuses: [['Aceptado','ok'],['Rechazado','no'],['Revisión','rv'],['Pendiente','pe']], maxVal: upeMax, label: 'UPE · Distribución por estatus', color: '#1e5b4f', leftWidth: 170, height: 30});
+    html += `<div class="viz-legend" style="padding-left: 180px;">
+      <span><i style="background:#144a40"></i>Aceptado</span>
+      <span><i style="background:#8a1d3d"></i>Rechazado</span>
+      <span><i style="background:#8e6a1f"></i>Revisión</span>
+      <span><i style="background:#c4c1b8"></i>Pendiente</span>
+    </div></div>`;
+  }
+  return html;
+}
+
+function renderVizUnit(view) {
+  // Limit to top 30 by UAS volume + empty CLUES list for clarity on big phases
+  let order = view.clues_order.slice();
+  // For phases with too many CLUES, limit to those with any activity (already filtered)
+  // and cap display at 35 for legibility
+  let truncated = false;
+  if (order.length > 35) {
+    order = order.slice(0, 35);
+    truncated = true;
+  }
+
+  const uasRows = order.map(code => {
+    const c = view.clues_data[code];
+    return {
+      code, name: c.short || c.nombre.slice(0, 30),
+      total: c.uas.total,
+      status: { 'Aprobado': c.uas.Aprobado, 'No aprobado': c.uas['No aprobado'], 'Pendiente': c.uas.Pendiente }
+    };
+  });
+  const uasMax = Math.max(1, ...uasRows.map(r => r.total));
+
+  const upeRows = order.map(code => {
+    const c = view.clues_data[code];
+    return {
+      code, name: c.short || c.nombre.slice(0, 30),
+      total: c.upe.total,
+      status: { 'Aceptado': c.upe.Aceptado, 'Rechazado': c.upe.Rechazado, 'Revisión': c.upe['Revisión'], 'Pendiente': c.upe.Pendiente }
+    };
+  });
+  const upeMax = Math.max(1, ...upeRows.map(r => r.total));
+
+  let html = '';
+  if (truncated) {
+    html += `<p class="detail-hint" style="margin-bottom: 12px;">Mostrando las 35 unidades con mayor volumen (de ${view.clues_order.length} con actividad).</p>`;
+  }
+  html += '<div class="viz-chart">';
+  html += buildBarChart({rows: uasRows, statuses: [['Aprobado','ok'],['No aprobado','no'],['Pendiente','pe']], maxVal: uasMax, label: `UAS · Por unidad médica (${order.length})`, color: '#9b2247', leftWidth: 250, height: 22});
+  html += `<div class="viz-legend" style="padding-left: 260px;">
+    <span><i style="background:#144a40"></i>Aprobado</span>
+    <span><i style="background:#8a1d3d"></i>No aprobado</span>
+    <span><i style="background:#c4c1b8"></i>Pendiente</span>
+  </div></div>`;
+
+  const totalUpe = upeRows.reduce((s, r) => s + r.total, 0);
+  if (totalUpe > 0) {
+    html += '<div class="viz-chart">';
+    html += buildBarChart({rows: upeRows, statuses: [['Aceptado','ok'],['Rechazado','no'],['Revisión','rv'],['Pendiente','pe']], maxVal: upeMax, label: `UPE · Por unidad médica (${order.length})`, color: '#1e5b4f', leftWidth: 250, height: 22});
+    html += `<div class="viz-legend" style="padding-left: 260px;">
+      <span><i style="background:#144a40"></i>Aceptado</span>
+      <span><i style="background:#8a1d3d"></i>Rechazado</span>
+      <span><i style="background:#8e6a1f"></i>Revisión</span>
+      <span><i style="background:#c4c1b8"></i>Pendiente</span>
+    </div></div>`;
+  }
+  return html;
+}
+
+function renderVizPanel(view) {
+  return `<button class="viz-toggle" type="button" onclick="toggleViz(this)" aria-expanded="false">
+    <span class="label">Mostrar visualización</span>
+    <span class="arr"></span>
+  </button>
+  <div class="viz-panel" id="vizPanel">
+    <div class="viz-switch" role="tablist">
+      <button type="button" class="active" data-view="cat" onclick="switchVizView(this)">Por categoría</button>
+      <button type="button" data-view="unit" onclick="switchVizView(this)">Por unidad médica</button>
+    </div>
+    <div class="viz-view active" data-view="cat">${renderVizCat(view)}</div>
+    <div class="viz-view" data-view="unit">${renderVizUnit(view)}</div>
+  </div>`;
+}
+
+function renderResumenTables(view) {
+  let html = '';
+  // UAS table
+  const ut = view.uas_status_totals;
+  html += `<div class="ledger-head">
+    <p class="name">UAS · por categoría</p>
+    <p class="stat">
+      <span class="ok">${ut.Aprobado} aprobado</span> ·
+      <span class="no">${ut['No aprobado']} no aprobado</span> ·
+      <span class="pe">${ut.Pendiente} pendiente</span>
+    </p>
+  </div>
+  <table><thead><tr>
+    <th>Categoría</th><th>Enviados</th><th>Aprobado</th><th>No aprobado</th><th>Pendiente</th>
+  </tr></thead><tbody>`;
+  for (const r of view.uas_categorias) {
+    html += `<tr>
+      <td>${escHtml(r.cat)}</td>
+      <td>${r.total}</td>
+      <td class="ok">${r.Aprobado || '—'}</td>
+      <td class="${r['No aprobado'] ? 'no' : 'pe'}">${r['No aprobado'] || '—'}</td>
+      <td class="pe">${r.Pendiente || '—'}</td>
+    </tr>`;
+  }
+  html += `</tbody></table>`;
+
+  // UPE table (skip if no UPE data)
+  if (view.upe_categorias.length) {
+    const pt = view.upe_status_totals;
+    html += `<div class="ledger-head">
+      <p class="name">UPE · por categoría</p>
+      <p class="stat">
+        <span class="ok">${pt.Aceptado} aceptado</span> ·
+        <span class="no">${pt.Rechazado} rechazado</span> ·
+        <span class="rv">${pt['Revisión']} revisión</span>
+      </p>
+    </div>
+    <table><thead><tr>
+      <th>Categoría</th><th>Enviados</th><th>Aceptado</th><th>Rechazado</th><th>Revisión</th>
+    </tr></thead><tbody>`;
+    for (const r of view.upe_categorias) {
+      html += `<tr>
+        <td>${escHtml(r.cat)}</td>
+        <td>${r.total}</td>
+        <td class="ok">${r.Aceptado || '—'}</td>
+        <td class="${r.Rechazado ? 'no' : 'pe'}">${r.Rechazado || '—'}</td>
+        <td class="${r['Revisión'] ? 'rv' : 'pe'}">${r['Revisión'] || '—'}</td>
+      </tr>`;
+    }
+    html += `</tbody></table>`;
+  }
+  return html;
+}
+
+function renderCluesBlocks(view) {
+  let html = `<p class="section-title">Desglose por CLUES — ${view.clues_order.length} unidades con candidatos</p>`;
+  for (const code of view.clues_order) {
+    const c = view.clues_data[code];
+    const u = c.uas, p = c.upe;
+
+    // Build category tags string for UAS row
+    const uasCatTags = Object.entries(u.cats || {})
+      .sort((a,b) => b[1] - a[1])
+      .map(([cat, n]) => `<span class="cat">${CAT_SHORT[cat] || '?'} ${n}</span>`).join('');
+    const upeCatTags = Object.entries(p.cats || {})
+      .sort((a,b) => b[1] - a[1])
+      .map(([cat, n]) => `<span class="cat">${CAT_SHORT[cat] || '?'} ${n}</span>`).join('');
+
+    const uasStatusStr = fmtStatus(u, UAS_STATUSES);
+    const upeStatusStr = fmtStatus(p, UPE_STATUSES);
+
+    html += `<div class="clues-block" data-clues="${code}" onclick="toggleClues(this)">
+      <div class="clues-head">
+        <div class="row-top">
+          <div>
+            <span class="clues-code">${code}</span>
+            <p class="clues-name">${escHtml(c.nombre || code)}</p>
+          </div>
+          <span class="clues-estado">${escHtml(c.estado || '')}</span>
+        </div>
+        <span class="chevron"></span>
+      </div>`;
+
+    if (u.total > 0) {
+      html += `<div class="row">
+        <span class="row-label uas">UAS</span>
+        <span class="row-total">${u.total}</span>
+        <span class="row-status">${uasStatusStr}</span>
+        <div class="cats">${uasCatTags}</div>
+      </div>`;
+    }
+    if (p.total > 0) {
+      html += `<div class="row">
+        <span class="row-label upe">UPE</span>
+        <span class="row-total">${p.total}</span>
+        <span class="row-status">${upeStatusStr}</span>
+        <div class="cats">${upeCatTags}</div>
+      </div>`;
+    }
+    html += `<div class="clues-detail" onclick="event.stopPropagation()"></div>`;
+    html += `</div>`;
+  }
+  return html;
+}
+
+function renderEmptyClues(view) {
+  if (!view.empty_clues || !view.empty_clues.length) return '';
+  let html = `<p class="section-title">CLUES sin candidatos al corte — ${view.empty_clues.length} unidades</p>
+    <div class="empty-list">`;
+  for (const e of view.empty_clues) {
+    html += `<div class="empty-row">
+      <span class="clues-code">${e.code}</span>
+      <span class="empty-name">${escHtml(e.nombre || '')}</span>
+      <span class="empty-estado">${escHtml(e.estado || '')}</span>
+      ${PHASE1_NOTES[e.code] ? `<span class="empty-note">${escHtml(PHASE1_NOTES[e.code])}</span>` : ''}
+    </div>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderDetailSource(label, cls, sourceData, statusOrder) {
+  const cats = Object.keys(sourceData).sort((a, b) => CAT_ORDER.indexOf(a) - CAT_ORDER.indexOf(b));
+  if (!cats.length) {
+    return `<div class="detail-source"><p class="detail-source-label ${cls}">${label}</p><p class="detail-hint">Sin candidatos en este flujo.</p></div>`;
+  }
+  let html = `<div class="detail-source"><p class="detail-source-label ${cls}">${label}</p>`;
+  for (const cat of cats) {
+    const puestos = sourceData[cat];
+    const total = puestos.reduce((s, p) => s + p.total, 0);
+    html += `<div class="detail-cat"><p class="detail-cat-name">${escHtml(cat)}<span class="count">${total}</span></p>`;
+    for (const p of puestos) {
+      html += `<div class="detail-puesto">
+        <span class="detail-puesto-name">${escHtml(p.puesto)}</span>
+        <span class="detail-puesto-total">${p.total}</span>
+        <span class="detail-puesto-status">${fmtStatus(p.status, statusOrder)}</span>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+/* Event handlers */
+function toggleClues(el) {
+  const code = el.dataset.clues;
+  const detail = el.querySelector('.clues-detail');
+  if (!detail) return;
+  if (!detail.dataset.rendered) {
+    const view = DATA.views[currentPhase];
+    const c = view.clues_data[code];
+    if (c) {
+      detail.innerHTML =
+        renderDetailSource('UAS — Detalle por puesto', 'uas', c.detail_uas || {}, UAS_STATUSES) +
+        renderDetailSource('UPE — Detalle por puesto', 'upe', c.detail_upe || {}, UPE_STATUSES);
+    }
+    detail.dataset.rendered = '1';
+  }
+  el.classList.toggle('open');
+}
+
+function toggleViz(btn) {
+  const panel = document.getElementById('vizPanel');
+  if (!panel) return;
+  const open = panel.classList.toggle('open');
+  btn.classList.toggle('open', open);
+  btn.querySelector('.label').textContent = open ? 'Ocultar visualización' : 'Mostrar visualización';
+}
+
+function switchVizView(btn) {
+  const view = btn.dataset.view;
+  const panel = btn.closest('.viz-panel');
+  panel.querySelectorAll('.viz-switch button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  panel.querySelectorAll('.viz-view').forEach(v => v.classList.toggle('active', v.dataset.view === view));
+}
+
+/* Phase rendering */
+let currentPhase = 'general';
+
+function renderPhase(phaseId) {
+  currentPhase = phaseId;
+  const view = DATA.views[phaseId];
+  if (!view) return;
+  const meta = DATA.phases.find(p => p.id === phaseId);
+
+  // Update phase info in header
+  document.getElementById('phaseInfo').innerHTML =
+    `Viendo <strong style="color: var(--ink);">${meta.label}</strong> · ${view.clues_order.length} unidades con actividad`
+    + (view.empty_clues.length ? ` · ${view.empty_clues.length} sin registros` : '');
+
+  // Update tab active state
+  document.querySelectorAll('.phase-tab').forEach(t => t.classList.toggle('active', t.dataset.phase === phaseId));
+
+  // Build content
+  let html = '';
+  html += renderTotales(view);
+  html += renderVizPanel(view);
+  html += renderResumenTables(view);
+  html += renderCluesBlocks(view);
+  html += renderEmptyClues(view);
+
+  document.getElementById('phaseContent').innerHTML = html;
+  window.scrollTo({top: 0, behavior: 'instant'});
+}
+
+/* Build phase selector tabs */
+function buildPhaseBar() {
+  const bar = document.getElementById('phaseBar');
+  bar.innerHTML = DATA.phases.map(p =>
+    `<button class="phase-tab" data-phase="${p.id}" onclick="renderPhase('${p.id}')" role="tab">
+      ${escHtml(p.label)}
+      <span class="sub">${escHtml(p.sub)}</span>
+    </button>`
+  ).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (DATA.corte) {
+    document.getElementById('corteLabel').textContent = 'Corte ' + DATA.corte;
+  }
+  buildPhaseBar();
+  renderPhase('general');
+});
+</script>
+</body>
+</html>
