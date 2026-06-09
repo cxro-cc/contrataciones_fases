@@ -37,7 +37,7 @@ jobs:
           --uas Candidatos_UAS.xlsx \
           --upe Candidatos_UPE.xlsx \
           --catalogo Unidades_Inauguradas_fases.xlsx \
-          --especial Fase_Especial.xlsx \
+          --especial Unidades especiales.xlsx \
           --plantilla plantilla_reporte.html \
           --salida index.html
 
