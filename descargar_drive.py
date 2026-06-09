@@ -35,7 +35,8 @@ def descargar_archivo(file_id, file_name):
 archivos = {
     "1Axj6z0U1odyFcdDz7Rjdv2jOZgnh9yIxKAXiWzvXKW4": "Candidatos_UAS.xlsx",
     "1iSEdYOU1uDF7Gwnu0o9ABR9hv3pI1INnrJv2Yt9jbN0": "Candidatos_UPE.xlsx",
-    "1VKPo1J0T5kF-0me6Yd3tz1-nKC5kI0My": "Unidades_Inauguradas_fases.xlsx"
+    "1VKPo1J0T5kF-0me6Yd3tz1-nKC5kI0My": "Unidades_Inauguradas_fases.xlsx",
+    "1rgip8zyPT8CDkrz52585fBt8gjyIwonS": "Unidades especiales.xlsx"
 }
 
 for f_id, f_name in archivos.items():
