@@ -42,7 +42,7 @@ from datetime import datetime
 # CLUES y nombres curados de Fase 1 (lista oficial original de 21 unidades).
 # Sirve para mostrar el bloque "CLUES sin candidatos" en la vista de Fase 1.
 PHASE1_CLUES = [
-    "BCIMB000623", "BCIMB001796", "BSIMB000812", "CCIMB001555", "DFIMB002341",
+    "BCIMB000623", "BCIMB001796", "BSIMB000812", "CCIMB001555", # "DFIMB002341",
     "DFIMB002353", "GRIMB010536", "MCIMB012476", "MNIMB004751", "OCIMB009626",
     "OCIMB009631", "OCIMB009643", "OCIMB009655", "OCIMB009660", "SLIMB002230",
     "SPIMB000585", "SRIMB000016", "VZIMB008946", "VZIMB008963", "VZIMB008980",
@@ -53,7 +53,7 @@ PHASE1_NAMES = {
     'BCIMB001796': 'Hospital General Tijuana Zona Este',
     'BSIMB000812': 'Hospital General de Santa Rosalía',
     'CCIMB001555': 'Centro de Salud El Naranjo',
-    'DFIMB002341': 'Hospital General Topilejo',
+ #   'DFIMB002341': 'Hospital General Topilejo',
     'DFIMB002353': 'Hospital Oncológico para la Mujer de la CDMX',
     'GRIMB010536': 'Hospital IMSS-Bienestar Tlapa',
     'MCIMB012476': 'Hospital General Atenco "Francisco Altamirano Núñez"',
@@ -71,6 +71,10 @@ PHASE1_NAMES = {
     'VZIMB008980': 'Hospital de la Comunidad de Nautla',
     'ZSIMB002650': 'Centro de Salud Jerez de García Salinas',
 }
+
+## FASE ESPECIAL
+FASE_ESPECIAL = [  "MCIMB012295", "QRIMB001956", "DFIMB001822", "SPIMB002574",
+  "DFIMB002341", "CSIMB001732", "DFIMB002435", "DFIMB002674", "TSIMB002865"]
 
 # Prefijo de CLUES (2 letras) -> entidad federativa
 CLUES_STATE = {
@@ -446,22 +450,34 @@ def compute_view(uas_df, upe_df, expected_clues=None, expected_names=None):
 
 
 def construir_payload(uas, upe, corte):
-    phases = sorted([p for p in set(uas['fase_norm'].dropna().tolist() +
-                                    upe['fase_norm'].dropna().tolist()) if p],
+    # Separate FASE_ESPECIAL candidates — excluded from numbered phases and sinfase
+    especial_set = set(FASE_ESPECIAL)
+    esp_mask_uas = uas['clues'].apply(clean_clues).isin(especial_set)
+    esp_mask_upe = upe['clues'].apply(clean_clues).isin(especial_set)
+    uas_esp = uas[esp_mask_uas]
+    upe_esp = upe[esp_mask_upe]
+    uas_base = uas[~esp_mask_uas]
+    upe_base = upe[~esp_mask_upe]
+
+    phases = sorted([p for p in set(uas_base['fase_norm'].dropna().tolist() +
+                                    upe_base['fase_norm'].dropna().tolist()) if p],
                     key=lambda x: int(x))
 
     views = {'general': compute_view(uas, upe)}
     for p in phases:
         if p == '1':
-            views['1'] = compute_view(uas[uas['fase_norm'] == '1'],
-                                      upe[upe['fase_norm'] == '1'],
+            views['1'] = compute_view(uas_base[uas_base['fase_norm'] == '1'],
+                                      upe_base[upe_base['fase_norm'] == '1'],
                                       PHASE1_CLUES, PHASE1_NAMES)
         else:
-            views[p] = compute_view(uas[uas['fase_norm'] == p],
-                                    upe[upe['fase_norm'] == p])
+            views[p] = compute_view(uas_base[uas_base['fase_norm'] == p],
+                                    upe_base[upe_base['fase_norm'] == p])
 
-    uas_sf = uas[uas['fase_norm'].isna()]
-    upe_sf = upe[upe['fase_norm'].isna()]
+    # Fase Especial — always included
+    views['especial'] = compute_view(uas_esp, upe_esp)
+
+    uas_sf = uas_base[uas_base['fase_norm'].isna()]
+    upe_sf = upe_base[upe_base['fase_norm'].isna()]
     has_sf = len(uas_sf) > 0 or len(upe_sf) > 0
     if has_sf:
         views['sinfase'] = compute_view(uas_sf, upe_sf)
@@ -471,6 +487,9 @@ def construir_payload(uas, upe, corte):
         v = views[p]
         meta.append({'id': p, 'label': f'Fase {p}',
                      'sub': f"{v['totales']['uas']} UAS · {v['totales']['upe']} UPE"})
+    v_esp = views['especial']
+    meta.append({'id': 'especial', 'label': 'Especial',
+                 'sub': f"{v_esp['totales']['uas']} UAS · {v_esp['totales']['upe']} UPE"})
     if has_sf:
         v = views['sinfase']
         meta.append({'id': 'sinfase', 'label': 'Sin fase',
