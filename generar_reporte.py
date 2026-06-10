@@ -246,10 +246,13 @@ def completar_cnpm_y_puesto(uas, upe):
 # --------------------------------------------------------------------
 # CARGA Y RESOLUCIÓN DE FASE
 # --------------------------------------------------------------------
-
 def cargar_y_resolver(uas_path, upe_path, catalogo_path):
     uas = pd.read_excel(uas_path)
-    upe = pd.read_excel(upe_path)
+    
+    hojas_upe = ['Nuevos', 'Pendientes', 'Aprobados', 'Rechazados'] 
+    
+    upe_diccionario = pd.read_excel(upe_path, sheet_name=hojas_upe)
+    upe = pd.concat(upe_diccionario.values(), ignore_index=True)
 
     for col in ['clues', 'fase', 'clave_puesto', 'CNPM', 'unidad_medica']:
         if col not in uas.columns:
