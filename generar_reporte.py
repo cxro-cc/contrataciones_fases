@@ -249,7 +249,8 @@ def completar_cnpm_y_puesto(uas, upe):
 def cargar_y_resolver(uas_path, upe_path, catalogo_path):
     uas = pd.read_excel(uas_path)
     
-    hojas_upe = ['Nuevos', 'Pendientes', 'Aprobados', 'Rechazados'] 
+    # Cambio en las hojas de UPE
+    hojas_upe = ['Hoja1'] 
     
     upe_diccionario = pd.read_excel(upe_path, sheet_name=hojas_upe)
     upe = pd.concat(upe_diccionario.values(), ignore_index=True)
