@@ -76,6 +76,23 @@ PHASE1_NAMES = {
 FASE_ESPECIAL = [  "MCIMB012295", "QRIMB001956", "DFIMB001822", "SPIMB002574",
   "DFIMB002341", "CSIMB001732", "DFIMB002435", "DFIMB002674", "TSIMB002865"]
 
+## HOSPITALES ANCLA
+CLUES_ANCLA = ['BCIMB000355',  'MNIMB003993',  'CSIMB003680',  'CSIMB001732',
+    'CSIMB003622', 'CSIMB005500', 'CSIMB005582', 'GRIMB004096', 'GRIMB005163',
+    'GRIMB008926', 'GRIMB008931', 'GRIMB010536', 'HGIMB001481', 'HGIMB004812',
+    'HGIMB005005', 'MCIMB005225', 'MCIMB009063', 'MCIMB009174', 'MCIMB009425', 
+    'MCIMB012073', 'MCIMB012476', 'MNIMB001292', 'MNIMB003940', 'MNIMB004734',
+    'MSIMB000292', 'NTIMB000551', 'NTIMB001654', 'OCIMB008815', 'OCIMB000881',
+    'OCIMB003133', 'OCIMB007625', 'OCIMB009660', 'PLIMB002516', 'PLIMB007083',
+    'PLIMB005910', 'PLIMB006016', 'PLIMB006103', 'PLIMB006885', 'PLIMB007112',
+    'QRIMB001606', 'QRIMB001623', 'QRIMB001973', 'SLIMB000014', 'SLIMB000031',
+    'SLIMB002254', 'SLIMB002481', 'SLIMB002930', 'SPIMB000240', 'SPIMB002970',
+    'SRIMB001404', 'SRIMB002203', 'TCIMB000786', 'TCIMB001841', 'TCIMB003446',
+    'TSIMB001955', 'TSIMB002520', 'VZIMB000826', 'VZIMB000983', 'VZIMB003491',
+    'VZIMB003911', 'VZIMB006315', 'VZIMB007575', 'VZIMB008053', 'ZSIMB000113',
+    'ZSIMB000492', 'ZSIMB002481', 'BSIMB000754', 'OCIMB009071', 'TSIMB001260',
+    'CCIMB001531', 'GRIMB001436', 'CSIMB000460']
+
 # Prefijo de CLUES (2 letras) -> entidad federativa
 CLUES_STATE = {
     'AS': 'Aguascalientes', 'BC': 'Baja California', 'BS': 'Baja California Sur',
@@ -290,7 +307,7 @@ def cargar_y_resolver(uas_path, upe_path, catalogo_path):
     upe = pd.read_excel(upe_path)
 
     # Columnas mínimas
-    for col in ['clues', 'fase', 'clave_puesto', 'CNPM', 'unidad_medica']:
+    for col in ['clues', 'fase', 'clave_puesto', 'CNPM', 'unidad_medica', 'turno']:
         if col not in uas.columns:
             uas[col] = None
         if col not in upe.columns:
@@ -464,11 +481,21 @@ def construir_payload(uas, upe, corte):
                     key=lambda x: int(x))
 
     views = {'general': compute_view(uas, upe)}
+    ancla_set = set(CLUES_ANCLA)
     for p in phases:
         if p == '1':
             views['1'] = compute_view(uas_base[uas_base['fase_norm'] == '1'],
                                       upe_base[upe_base['fase_norm'] == '1'],
                                       PHASE1_CLUES, PHASE1_NAMES)
+        elif p == '3':
+            uas_f3 = uas_base[uas_base['fase_norm'] == '3']
+            upe_f3 = upe_base[upe_base['fase_norm'] == '3']
+            mask_uas3 = (uas_f3['clues'].apply(clean_clues).isin(ancla_set) &
+                         uas_f3['turno'].fillna('').str.strip().str.lower().eq('equipo itinerante'))
+            mask_upe3 = (upe_f3['clues'].apply(clean_clues).isin(ancla_set) &
+                         upe_f3['turno'].fillna('').str.strip().str.lower().eq('equipo itinerante'))
+            views['3'] = compute_view(uas_f3[mask_uas3], upe_f3[mask_upe3])
+            views['3b'] = compute_view(uas_f3[~mask_uas3], upe_f3[~mask_upe3])
         else:
             views[p] = compute_view(uas_base[uas_base['fase_norm'] == p],
                                     upe_base[upe_base['fase_norm'] == p])
@@ -487,6 +514,10 @@ def construir_payload(uas, upe, corte):
         v = views[p]
         meta.append({'id': p, 'label': f'Fase {p}',
                      'sub': f"{v['totales']['uas']} UAS · {v['totales']['upe']} UPE"})
+        if p == '3' and '3b' in views:
+            v3b = views['3b']
+            meta.append({'id': '3b', 'label': 'Fase 3 brecha específica',
+                         'sub': f"{v3b['totales']['uas']} UAS · {v3b['totales']['upe']} UPE"})
     v_esp = views['especial']
     meta.append({'id': 'especial', 'label': 'Especial',
                  'sub': f"{v_esp['totales']['uas']} UAS · {v_esp['totales']['upe']} UPE"})
