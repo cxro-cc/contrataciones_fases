@@ -12,18 +12,11 @@ USO:
         --uas      Candidatos_UAS.xlsx \
         --upe      Candidatos_UPE.xlsx \
         --catalogo Unidades_Inauguradas_fases.xlsx \
+        --especial Fase_Especial.xlsx \
         --plantilla plantilla_reporte.html \
-        --salida   reporte_fases.html 
+        --salida   index.html 
 
 REQUISITOS:  pip install pandas openpyxl
-
-LÓGICA DE ASIGNACIÓN DE FASE (cascada de 3 pasos):
-  1. Si la fila ya trae fase válida → se respeta.
-  2. Si no, pero la misma CLUES tiene fase (sin ambigüedad) en otra
-     fila de los archivos de candidatos → la hereda.
-  3. Si sigue sin fase → la busca en el catálogo oficial, usando la
-     fase MÁS TEMPRANA cuando la unidad aparece en varias fases.
-  (Si tras los 3 pasos aún queda sin fase, se agrupa en "Sin fase".)
 ====================================================================
 """
 
@@ -39,10 +32,8 @@ from datetime import datetime
 # CONFIGURACIÓN  (editable)
 # --------------------------------------------------------------------
 
-# CLUES y nombres curados de Fase 1 (lista oficial original de 21 unidades).
-# Sirve para mostrar el bloque "CLUES sin candidatos" en la vista de Fase 1.
 PHASE1_CLUES = [
-    "BCIMB000623", "BCIMB001796", "BSIMB000812", "CCIMB001555", # "DFIMB002341",
+    "BCIMB000623", "BCIMB001796", "BSIMB000812", "CCIMB001555",
     "DFIMB002353", "GRIMB010536", "MCIMB012476", "MNIMB004751", "OCIMB009626",
     "OCIMB009631", "OCIMB009643", "OCIMB009655", "OCIMB009660", "SLIMB002230",
     "SPIMB000585", "SRIMB000016", "VZIMB008946", "VZIMB008963", "VZIMB008980",
@@ -53,7 +44,6 @@ PHASE1_NAMES = {
     'BCIMB001796': 'Hospital General Tijuana Zona Este',
     'BSIMB000812': 'Hospital General de Santa Rosalía',
     'CCIMB001555': 'Centro de Salud El Naranjo',
- #   'DFIMB002341': 'Hospital General Topilejo',
     'DFIMB002353': 'Hospital Oncológico para la Mujer de la CDMX',
     'GRIMB010536': 'Hospital IMSS-Bienestar Tlapa',
     'MCIMB012476': 'Hospital General Atenco "Francisco Altamirano Núñez"',
@@ -107,13 +97,11 @@ CLUES_STATE = {
     'ZS': 'Zacatecas',
 }
 
-# Orden fijo de categorías en las tablas resumen
 UAS_CAT_ORDER = ['Enfermería', 'Médicos especialistas', 'Médicos generales',
                  'Otros profesionales de salud', 'Administrativos y apoyo', 'Otros']
 UPE_CAT_ORDER = ['Médicos especialistas', 'Enfermería', 'Médicos generales',
                  'Otros profesionales de salud', 'Administrativos y apoyo', 'Otros']
 
-# Marcador en la plantilla que será reemplazado por los datos
 PLACEHOLDER = '__PAYLOAD__'
 
 
@@ -122,21 +110,17 @@ PLACEHOLDER = '__PAYLOAD__'
 # --------------------------------------------------------------------
 
 def norm_fase(x):
-    """Normaliza la columna fase a string '1'..'6' o None."""
     if pd.notna(x) and str(x).strip().replace('.', '').isdigit():
         return str(int(float(x)))
     return None
 
 
 def clean_clues(c):
-    """Extrae el código base XXIMB###### ignorando sufijos manuales
-    como '. R' o '. HBC PETATLAN'."""
     m = re.match(r'([A-Z]{2}IMB\d+)', str(c))
     return m.group(1) if m else str(c).strip()
 
 
 def title_case_es(s):
-    """Title Case respetando conectores en minúscula."""
     s = str(s).strip()
     if not s or s.lower() == 'nan':
         return ''
@@ -148,7 +132,6 @@ def title_case_es(s):
 
 
 def short_name(full):
-    """Versión corta del nombre de la unidad para etiquetas de gráficos."""
     if not full:
         return ''
     s = re.sub(r'^Hospital\s+(de|del)?\s*', '', full, flags=re.I)
@@ -164,7 +147,6 @@ def state_from_clues(c):
 
 
 def categorize(row):
-    """Clasifica el puesto en una categoría profesional."""
     cnpm = str(row.get('CNPM', '')).strip()
     puesto = str(row.get('clave_puesto', '')).upper()
     if cnpm.startswith('ME'):
@@ -195,11 +177,9 @@ def uas_estado(v):
 
 
 def upe_estado(v):
-    """Normaliza estatus UPE. Maneja espacios extra como 'Revisión '."""
     if pd.isna(v) or str(v).strip() == '':
         return 'Pendiente'
     s = str(v).strip()
-    # normaliza variantes con espacios/acentos
     low = s.lower()
     if low.startswith('acept'):
         return 'Aceptado'
@@ -219,7 +199,6 @@ def unidad_lookup(clues, *dfs):
 
 
 def _clean_value(v):
-    """Trim string values; preserves NaN/None."""
     if pd.isna(v):
         return v
     s = str(v).strip()
@@ -227,23 +206,13 @@ def _clean_value(v):
 
 
 def completar_cnpm_y_puesto(uas, upe):
-    """Limpia y completa CNPM ↔ clave_puesto por:
-    1) Extracción del CNPM embebido al inicio de clave_puesto (ej. 'EN002 ENFERMERA…').
-    2) Herencia cruzada por moda (puesto ↔ CNPM más frecuente en otras filas).
-    """
-    # 0) Limpieza de espacios en blanco
     for df in (uas, upe):
         df['CNPM'] = df['CNPM'].apply(_clean_value)
         df['clave_puesto'] = df['clave_puesto'].apply(_clean_value)
 
-    # 1) Extracción de CNPM desde el prefijo de clave_puesto cuando aplica
-    #    Patrones: 'EN002 ENFERMERA…' o 'CPSFFF0003. PROMOTOR…'
     cnpm_prefix = re.compile(r'^([A-Z]{2,6}\d{3,5})[\s\.]')
 
     def extract_and_strip(row):
-        """Devuelve (cnpm_extraido_o_NaN, clave_puesto_limpia).
-        Si la clave_puesto trae un código embebido, lo extrae y lo elimina
-        del texto de la clave_puesto, dejando solo el nombre legible."""
         kp = row['clave_puesto']
         cn = row['CNPM']
         if pd.isna(kp):
@@ -252,7 +221,6 @@ def completar_cnpm_y_puesto(uas, upe):
         if m:
             extracted = m.group(1)
             kp_clean = str(kp)[m.end():].strip()
-            # solo asignamos si el CNPM venía vacío
             if pd.isna(cn) or not cn:
                 cn = extracted
             return cn, kp_clean
@@ -272,7 +240,6 @@ def completar_cnpm_y_puesto(uas, upe):
             recovered_upe = before - after
     print(f"  Extracción de CNPM desde prefijo de clave_puesto: UAS +{recovered_uas} · UPE +{recovered_upe}")
 
-    # 2) Mapas globales por moda
     both = pd.concat([uas[['clave_puesto', 'CNPM']],
                       upe[['clave_puesto', 'CNPM']]], ignore_index=True)
     known = both.dropna(subset=['clave_puesto', 'CNPM'])
@@ -320,13 +287,11 @@ def cargar_y_resolver(uas_path, upe_path, catalogo_path):
     uas['fase_norm'] = uas['fase'].apply(norm_fase)
     upe['fase_norm'] = upe['fase'].apply(norm_fase)
 
-    # --- Catálogo: CLUES base -> fase más temprana ---
     cat_earliest = {}
     if catalogo_path:
         try:
             cat = pd.read_excel(catalogo_path, sheet_name='brecha')
         except Exception:
-            # intenta primera hoja con columnas esperadas
             xl = pd.ExcelFile(catalogo_path)
             cat = None
             for sh in xl.sheet_names:
@@ -343,7 +308,6 @@ def cargar_y_resolver(uas_path, upe_path, catalogo_path):
                 lambda x: sorted(set(x.dropna()), key=int))
             cat_earliest = {c: fs[0] for c, fs in grouped.items() if fs}
 
-    # --- Paso 2: herencia entre filas hermanas (mismo CLUES, fase no ambigua) ---
     combined = {}
     for df in (uas, upe):
         for clues, grp in df[df['fase_norm'].notna()].groupby('clues'):
@@ -355,10 +319,10 @@ def cargar_y_resolver(uas_path, upe_path, catalogo_path):
         if pd.notna(row['fase_norm']) and row['fase_norm'] is not None:
             return row['fase_norm']
         c = row['clues']
-        if c in sibling_map:                       # paso 2
+        if c in sibling_map:
             return sibling_map[c]
         cc = clean_clues(c)
-        if cc in cat_earliest:                     # paso 3
+        if cc in cat_earliest:
             return cat_earliest[cc]
         return None
 
@@ -368,11 +332,9 @@ def cargar_y_resolver(uas_path, upe_path, catalogo_path):
     after = uas['fase_norm'].isna().sum() + upe['fase_norm'].isna().sum()
     print(f"  Registros sin fase: {before} -> {after} (resueltos {before - after})")
 
-    # Limpia y completa CNPM ↔ clave_puesto antes de categorizar
     print("Completando CNPM y clave_puesto…")
     uas, upe = completar_cnpm_y_puesto(uas, upe)
 
-    # Derivadas
     uas['categoria'] = uas.apply(categorize, axis=1)
     upe['categoria'] = upe.apply(categorize, axis=1)
     uas['estado_rev'] = uas['REVISION_UAS'].apply(uas_estado)
@@ -466,9 +428,9 @@ def compute_view(uas_df, upe_df, expected_clues=None, expected_names=None):
     return view
 
 
-def construir_payload(uas, upe, corte):
-    # Separate FASE_ESPECIAL candidates — excluded from numbered phases and sinfase
-    especial_set = set(FASE_ESPECIAL)
+# El parámetro fase_especial ahora se recibe dinámicamente aquí abajo
+def construir_payload(uas, upe, corte, fase_especial):
+    especial_set = set(fase_especial)
     esp_mask_uas = uas['clues'].apply(clean_clues).isin(especial_set)
     esp_mask_upe = upe['clues'].apply(clean_clues).isin(especial_set)
     uas_esp = uas[esp_mask_uas]
@@ -500,7 +462,6 @@ def construir_payload(uas, upe, corte):
             views[p] = compute_view(uas_base[uas_base['fase_norm'] == p],
                                     upe_base[upe_base['fase_norm'] == p])
 
-    # Fase Especial — always included
     views['especial'] = compute_view(uas_esp, upe_esp)
 
     uas_sf = uas_base[uas_base['fase_norm'].isna()]
@@ -537,8 +498,11 @@ def main():
     ap = argparse.ArgumentParser(description="Genera el reporte HTML de candidatos por fase.")
     ap.add_argument('--uas', required=True, help="Excel de candidatos UAS")
     ap.add_argument('--upe', required=True, help="Excel de candidatos UPE")
-    ap.add_argument('--catalogo', default=None,
-                    help="Excel catálogo de fases (hoja 'brecha'). Opcional pero recomendado.")
+    ap.add_argument('--catalogo', default=None, help="Excel catálogo de fases (hoja 'brecha').")
+    
+    # LA SOLUCIÓN INICIA AQUÍ: Agregamos el parámetro para el archivo de OneDrive
+    ap.add_argument('--especial', required=True, help="Excel de la Fase Especial proveniente de OneDrive")
+    
     ap.add_argument('--plantilla', required=True, help="Plantilla HTML con el marcador __PAYLOAD__")
     ap.add_argument('--salida', default='index.html', help="Archivo HTML de salida")
     args = ap.parse_args()
@@ -546,18 +510,24 @@ def main():
     print("Cargando y resolviendo fases…")
     uas, upe = cargar_y_resolver(args.uas, args.upe, args.catalogo)
 
+    # LA SOLUCIÓN CONTINÚA AQUÍ: Leemos el archivo descargado desde OneDrive dentro de main()
+    print("Cargando catálogo de la Fase Especial desde OneDrive…")
+    df_especial = pd.read_excel(args.especial)
+    fase_especial_list = df_especial['clues'].dropna().unique().tolist()
+
     print("Calculando vistas…")
     corte = datetime.now().strftime('%d / %m / %Y a las %H:%M')
-    payload = construir_payload(uas, upe, corte)
+    
+    # Pasamos la lista leída a la función constructora del JSON
+    payload = construir_payload(uas, upe, corte, fase_especial_list)
 
     print("Inyectando en la plantilla…")
     with open(args.plantilla, 'r', encoding='utf-8') as f:
         html = f.read()
     if PLACEHOLDER not in html:
-        # si se pasa el reporte ya generado, reemplaza el bloque DATA existente
         html = re.sub(r'const DATA = \{.*?\};\n',
                       'const DATA = ' + json.dumps(payload, ensure_ascii=False,
-                                                    separators=(',', ':')) + ';\n',
+                                                   separators=(',', ':')) + ';\n',
                       html, count=1, flags=re.DOTALL)
     else:
         html = html.replace(PLACEHOLDER,
