@@ -33,7 +33,7 @@ from datetime import datetime
 # --------------------------------------------------------------------
 
 PHASE1_CLUES = [
-    "BCIMB000623", "BCIMB001796", "BSIMB000812", "CCIMB001555",
+    "BCIMB000623", "BCIMB001796", "BSIMB000812", "CCIMB001555", "DFIMB002341"
     "DFIMB002353", "GRIMB010536", "MCIMB012476", "MNIMB004751", "OCIMB009626",
     "OCIMB009631", "OCIMB009643", "OCIMB009655", "OCIMB009660", "SLIMB002230",
     "SPIMB000585", "SRIMB000016", "VZIMB008946", "VZIMB008963", "VZIMB008980",
@@ -60,6 +60,7 @@ PHASE1_NAMES = {
     'VZIMB008963': 'Hospital de Salud Mental Orizaba "Dr. Víctor M. Concha Vásquez"',
     'VZIMB008980': 'Hospital de la Comunidad de Nautla',
     'ZSIMB002650': 'Centro de Salud Jerez de García Salinas',
+    'DFIMB002341': 'Hospital General Topilejo'
 }
 
 ## FASE ESPECIAL
