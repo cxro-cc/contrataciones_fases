@@ -347,6 +347,8 @@ def cargar_y_resolver(uas_path, upe_path, catalogo_path):
 # --------------------------------------------------------------------
 
 def compute_view(uas_df, upe_df, expected_clues=None, expected_names=None):
+    uas_df = uas_df.dropna(subset='fecha')
+
     view = {'totales': {
         'uas': int(len(uas_df)),
         'upe': int(len(upe_df)),
